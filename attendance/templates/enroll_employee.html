@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enrôler un Employé</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <!-- Ajoute FontAwesome pour les icônes -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Cadre pour guider la capture du visage */
+        .webcam-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .webcam-container video {
+            width: 100%;
+            border-radius: 10px;
+        }
+        .face-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 4px solid #3B82F6;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-r from-blue-50 to-purple-50">
+    <!-- Barre de navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <img src="{% static 'images/logo.png' %}" alt="Logo" class="h-10 w-10 mr-2">
+                    <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="{% url 'dashboard' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">Tableau de bord</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Section principale -->
+    <div class="flex flex-col items-center justify-center min-h-screen py-12">
+        <div class="w-full max-w-4xl bg-white rounded-lg shadow-2xl p-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Enrôler un Employé</h1>
+
+            <!-- Formulaire d'enrôlement -->
+            <form method="POST" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                <!-- Champ Nom -->
+                <div>
+                    <label for="name" class="block text-gray-700 font-bold mb-2">Nom :</label>
+                    <input type="text" name="name" id="name" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" required>
+                </div>
+            
+                <!-- Champ Email -->
+                <div>
+                    <label for="email" class="block text-gray-700 font-bold mb-2">Email :</label>
+                    <input type="email" name="email" id="email" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" required>
+                </div>
+            
+                <!-- Champ Rôle -->
+                <div>
+                    <label for="role" class="block text-gray-700 font-bold mb-2">Rôle :</label>
+                    <select name="role" id="role" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" required>
+                        <option value="admin">Admin</option>
+                        <option value="employee">Employé</option>
+                    </select>
+                </div>
+            
+                <!-- Webcam et capture de photo -->
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">Capture de la photo :</label>
+                    <div class="webcam-container">
+                        <video id="webcam" autoplay class="w-full h-auto rounded-lg"></video>
+                        <div class="face-guide"></div>
+                        <canvas id="photo-canvas" class="hidden"></canvas>
+                    </div>
+                    <button type="button" id="capture-button" class="mt-4 w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">
+                        <i class="fas fa-camera mr-2"></i> Prendre une photo
+                    </button>
+                    <img id="photo-preview" class="mt-2 w-32 h-32 rounded-lg hidden" alt="Aperçu de la photo">
+                    <!-- Champ caché pour stocker la photo en base64 -->
+                    <input type="hidden" name="photo" id="photo-input">
+                </div>
+            
+                <!-- Bouton d'enrôlement -->
+                <div class="text-center">
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all">
+                        <i class="fas fa-user-plus mr-2"></i> Enrôler l'employé
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script pour gérer la webcam et la capture de photo -->
+    <script>
+        // Accéder à la webcam
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('photo-canvas');
+        const photoPreview = document.getElementById('photo-preview');
+        const captureButton = document.getElementById('capture-button');
+
+        // Démarrer la webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((error) => {
+                console.error("Erreur d'accès à la webcam :", error);
+                alert("Impossible d'accéder à la webcam. Veuillez autoriser l'accès.");
+            });
+
+        // Capturer une photo
+      // Capturer une photo
+captureButton.addEventListener('click', () => {
+    const context = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convertir l'image en base64
+    const photoDataUrl = canvas.toDataURL('image/jpeg');
+    photoPreview.src = photoDataUrl;
+    photoPreview.classList.remove('hidden');
+
+    // Ajouter les données de l'image au champ caché
+    document.getElementById('photo-input').value = photoDataUrl;
+});
+    </script>
+</body>
+</html>

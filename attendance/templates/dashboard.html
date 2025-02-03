@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <!-- Ajoute FontAwesome pour les icônes -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-r from-blue-50 to-purple-50">
+    <!-- Barre de navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <img src="{% static 'images/logo.png' %}" alt="Logo" class="h-10 w-10 mr-2">
+                    <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="{% url 'dashboard' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                        Tableau de bord
+                    </a>
+                    <a href="{% url 'attendance_list' %}" class="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all transform hover:scale-105">
+                        Liste des employés
+                    </a>
+                    <a href="{% url 'enroll_employee' %}" class="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-all transform hover:scale-105">
+                        Enrôler un employé
+                    </a>
+                    <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all transform hover:scale-105">
+                        Déconnexion
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Section principale -->
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Tableau de bord</h1>
+
+        <!-- Widgets de statistiques -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Nombre total d'employés -->
+            <div class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Employés enregistrés</h3>
+                <p class="text-3xl text-blue-500 font-bold">{{ total_employees }}</p>
+            </div>
+
+            <!-- Présences aujourd'hui -->
+            <div class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Présences aujourd'hui</h3>
+                <p class="text-3xl text-green-500 font-bold">{{ present_today }}</p>
+            </div>
+
+            <!-- Absents aujourd'hui -->
+            <div class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Absents aujourd'hui</h3>
+                <p class="text-3xl text-red-500 font-bold">{{ absent_today }}</p>
+            </div>
+        </div>
+
+        <!-- Taux de présence -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8 transform transition-all duration-300 hover:scale-105">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Taux de présence</h3>
+            <div class="w-full bg-gray-200 rounded-full h-4">
+                <div class="bg-blue-500 h-4 rounded-full" style="width: {{ attendance_rate }}%;"></div>
+            </div>
+            <p class="text-gray-600 mt-2">{{ attendance_rate }}%</p>
+        </div>
+
+        <!-- Liens rapides -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <a href="{% url 'attendance_list' %}" class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+                <i class="fas fa-users text-4xl text-blue-500 mb-4"></i>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Liste des employés</h3>
+                <p class="text-gray-600">Voir tous les employés enregistrés.</p>
+            </a>
+            <a href="{% url 'enroll_employee' %}" class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+                <i class="fas fa-user-plus text-4xl text-green-500 mb-4"></i>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Enrôler un employé</h3>
+                <p class="text-gray-600">Ajouter un nouvel employé au système.</p>
+            </a>
+            <a href="#" class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+                <i class="fas fa-calendar-alt text-4xl text-purple-500 mb-4"></i>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Gérer les horaires</h3>
+                <p class="text-gray-600">Définir les horaires de travail.</p>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

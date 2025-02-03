@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pointage des Présences</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-r from-blue-50 to-purple-50">
+    <!-- Barre de navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <img src="{% static 'images/logo.png' %}" alt="Logo" class="h-10 w-10 mr-2">
+                    <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="{% url 'mark_attendance' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">Pointer ma présence</a>
+                    <a href="{% url 'attendance_history' %}" class="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all">Mon historique</a>
+                    <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all">Déconnexion</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Section principale -->
+    <div class="flex flex-col items-center justify-center min-h-screen py-12">
+        <div class="w-full max-w-4xl bg-white rounded-lg shadow-2xl p-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Pointage des Présences</h1>
+
+            <!-- Widget de pointage -->
+            <div class="bg-gray-50 p-6 rounded-lg shadow-md text-center">
+                <p class="text-gray-600 mb-4">Cliquez sur le bouton ci-dessous pour pointer votre présence.</p>
+
+                <!-- Webcam et capture de photo -->
+                <div class="webcam-container mb-4">
+                    <video id="webcam" autoplay class="w-full h-auto rounded-lg"></video>
+                    <canvas id="photo-canvas" class="hidden"></canvas>
+                </div>
+                <button id="capture-button" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all mb-4">
+                    <i class="fas fa-camera mr-2"></i> Prendre une photo
+                </button>
+                <img id="photo-preview" class="mt-2 w-32 h-32 rounded-lg hidden" alt="Aperçu de la photo">
+
+                <!-- Bouton pour envoyer la photo -->
+                <button id="mark-attendance-button" class="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all">
+                    <i class="fas fa-fingerprint mr-2"></i> Pointer ma présence
+                </button>
+            </div>
+
+            <!-- Affichage du résultat -->
+            <div id="message" class="mt-6 text-center text-gray-600"></div>
+        </div>
+    </div>
+
+    <!-- Script pour gérer la webcam et la capture de photo -->
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('photo-canvas');
+        const photoPreview = document.getElementById('photo-preview');
+        const captureButton = document.getElementById('capture-button');
+        const markButton = document.getElementById('mark-attendance-button');
+        let photoDataUrl = null;
+
+        // Démarrer la webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((error) => {
+                console.error("Erreur d'accès à la webcam :", error);
+                alert("Impossible d'accéder à la webcam. Veuillez autoriser l'accès.");
+            });
+
+        // Capturer une photo
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convertir l'image en base64
+            photoDataUrl = canvas.toDataURL('image/jpeg');
+            photoPreview.src = photoDataUrl;
+            photoPreview.classList.remove('hidden');
+        });
+
+        // Envoyer la photo au serveur
+        markButton.addEventListener('click', async () => {
+            if (!photoDataUrl) {
+                alert("Veuillez d'abord capturer une photo.");
+                return;
+            }
+
+            markButton.disabled = true;
+            markButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Pointage en cours...';
+
+            try {
+                const response = await fetch("{% url 'mark_attendance' %}", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": "{{ csrf_token }}",
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ photo: photoDataUrl }),
+                });
+                const data = await response.json();
+
+                const message = document.getElementById('message');
+                if (response.ok) {
+                    message.textContent = data.success;
+                    message.classList.remove('text-red-500');
+                    message.classList.add('text-green-500');
+                } else {
+                    message.textContent = data.error || "Erreur lors du pointage.";
+                    message.classList.remove('text-green-500');
+                    message.classList.add('text-red-500');
+                }
+            } catch (error) {
+                console.error("Erreur :", error);
+                alert("Une erreur est survenue.");
+            } finally {
+                markButton.disabled = false;
+                markButton.innerHTML = '<i class="fas fa-fingerprint mr-2"></i> Pointer ma présence';
+            }
+        });
+    </script>
+</body>
+</html>
