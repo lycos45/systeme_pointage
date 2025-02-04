@@ -145,12 +145,20 @@ LOGIN_URL = '/login/'  # URL de la page de connexion
 # Exemple pour utiliser Gmail comme serveur SMTP
 
 #config = Config(repository='.env')
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER="ousmanecoly543@gmail.com"
-EMAIL_HOST_PASSWORD="@Mamansy45"
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')  # Récupère la variable du .env
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD') 
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

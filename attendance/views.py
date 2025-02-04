@@ -25,7 +25,11 @@ import numpy as np
 from datetime import date ,timedelta ,datetime
 from django.core.files.base import ContentFile
 from django.views.decorators.csrf import csrf_exempt
-
+import secrets
+import string
+from django.core.mail import send_mail
+from django.conf import settings
+from django.template.loader import render_to_string
 
 def home(request):
     return render(request, 'home.html')  
@@ -45,49 +49,6 @@ def login_view(request):
         else:
             messages.error(request, "Nom d'utilisateur ou mot de passe incorrect.")
     return render(request, 'login.html')
-
-"""
-def register(request):
-    if request.method == 'POST':
-        username = request.POST['username']
-        first_name = request.POST['first_name']
-        last_name = request.POST['last_name']
-        email = request.POST['email']
-        password = request.POST['password']
-        password_confirm = request.POST['password_confirm']
-
-        # Vérifier que les mots de passe correspondent
-        if password != password_confirm:
-            messages.error(request, "Les mots de passe ne correspondent pas.")
-            return redirect('register')
-
-        try:
-            # Créer un nouvel utilisateur
-            user = User.objects.create_user(
-                username=username,
-                first_name=first_name,
-                last_name=last_name,
-                email=email,
-                password=password
-            )
-            user.save()
-
-            # Créer un employé et le lier à l'utilisateur
-            employee = Employee.objects.create(
-                user=user,  # Lie l'employé à l'utilisateur
-                name=f"{first_name} {last_name}",  # Utilise le nom complet
-                email=email,
-                role='employee',  # Par défaut, le rôle est 'employee'
-            )
-            employee.save()
-
-            messages.success(request, "Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.")
-            return redirect('login')  # Redirige vers la page de connexion après l'inscription réussie
-        except Exception as e:
-            messages.error(request, f"Erreur : {e}")
-            return redirect('register')
-    return render(request, 'register.html')
-"""
 
 def logout_view(request):
     logout(request)
@@ -119,18 +80,6 @@ def verify_email(request, user_id, code):
 
 
 
-def send_verification_email(user):
-    code = get_random_string(length=6, allowed_chars='0123456789')
-    EmailVerification.objects.create(user=user, code=code)
-    verification_url = f'http://votre_site.com/verify_email/{user.id}/{code}/'
-    send_mail(
-    'Test Email',
-    'Ceci est un test d\'envoi d\'e-mail.',
-    'your_email@gmail.com',
-    ['destination_email@example.com'],
-    fail_silently=False,
-)
-
 # Vue pour enrôler un employé
 
 def enroll_employee(request):
@@ -138,46 +87,72 @@ def enroll_employee(request):
         name = request.POST.get('name')
         email = request.POST.get('email')
         role = request.POST.get('role')
-        photo_data = request.POST.get('photo')  # Récupérer les données base64
+        photo_data = request.POST.get('photo')
 
-        # Vérifier si l'email est déjà utilisé dans auth_user
+        # Vérifier si l'email est déjà utilisé
         if User.objects.filter(email=email).exists():
             return JsonResponse({"error": "Cet email est déjà utilisé."}, status=400)
 
-        # Convertir l'image base64 en fichier binaire
-        if photo_data:
-            format, imgstr = photo_data.split(';base64,')  # Séparer le préfixe
-            ext = format.split('/')[-1]  # Récupérer l'extension (ex: jpeg)
-            photo = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
-        else:
-            return JsonResponse({"error": "Aucune photo n'a été capturée."}, status=400)
+        # Vérifier si une photo est fournie
+        if not photo_data or ';base64,' not in photo_data:
+            return JsonResponse({"error": "Photo invalide ou absente."}, status=400)
 
-        # Lire l'image et extraire les descripteurs faciaux
-        image = face_recognition.load_image_file(photo)
-        face_encodings = face_recognition.face_encodings(image)
+        try:
+            # Convertir l'image base64 en fichier binaire
+            format, imgstr = photo_data.split(';base64,')
+            ext = format.split('/')[-1]
+            photo = ContentFile(base64.b64decode(imgstr), name=f'{name}_profile.{ext}')
 
-        if len(face_encodings) == 0:
-            return JsonResponse({"error": "Aucun visage détecté dans la photo."}, status=400)
+            # Lire l'image et extraire les descripteurs faciaux
+            image = face_recognition.load_image_file(photo)
+            face_encodings = face_recognition.face_encodings(image)
 
-        face_descriptor = face_encodings[0]  # Utilise le premier visage détecté
+            if not face_encodings:
+                return JsonResponse({"error": "Aucun visage détecté."}, status=400)
 
-        # Créer un nouvel utilisateur
-        user = User.objects.create_user(
-            username=email,  # Utilisez l'e-mail comme nom d'utilisateur
-            email=email,
-            password='default_password'  # Vous pouvez générer un mot de passe aléatoire ou utiliser une valeur par défaut
-        )
+            face_descriptor = face_encodings[0]
 
-        # Enregistrer l'employé dans la base de données
-        employee = Employee.objects.create(
-            user=user,  # Lier l'employé à l'utilisateur
-            name=name,
-            role=role,
-            face_descriptor=face_descriptor.tobytes()  # Sauvegarde des descripteurs
-        )
-        employee.profile_picture.save(f'{employee.name}_profile.jpg', photo)
+            # Générer un mot de passe temporaire
+            password = generate_password()
 
-        return JsonResponse({"success": "Enrôlement réussi !"}, status=200)
+            # Créer un utilisateur
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password
+            )
+
+            # Créer un employé
+            employee = Employee.objects.create(
+                user=user,
+                name=name,
+                role=role,
+                face_descriptor=face_descriptor.tobytes()
+            )
+            employee.profile_picture.save(f'{employee.name}_profile.jpg', photo)
+
+            # Envoi de l'e-mail avec un template HTML
+            subject = "Vos informations de connexion"
+            html_message = render_to_string('emails/enrollment_email.html', {
+                'name': name,
+                'email': email,
+                'password': password,
+                'login_url': "http://votre-site.com/login"
+            })
+
+            send_mail(
+                subject,
+                '',  # On laisse le corps vide car on utilise le format HTML
+                settings.EMAIL_HOST_USER,
+                [email],
+                fail_silently=False,
+                html_message=html_message
+            )
+
+            return JsonResponse({"success": "Enrôlement réussi ! Un e-mail a été envoyé."}, status=200)
+
+        except Exception as e:
+            return JsonResponse({"error": f"Une erreur est survenue : {str(e)}"}, status=500)
 
     return render(request, 'enroll_employee.html')
 # Vue pour le pointage des présences
@@ -252,3 +227,8 @@ def attendance_list(request):
     }
 
     return render(request, 'attendance_list.html', context)
+
+def generate_password(length=12):
+    """Génère un mot de passe aléatoire."""
+    characters = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(characters) for _ in range(length))
