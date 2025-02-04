@@ -44,6 +44,12 @@
                 </div>
                 <div class="flex space-x-4">
                     <a href="{% url 'dashboard' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">Tableau de bord</a>
+                    <a href="{% url 'attendance_list' %}" class="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all transform hover:scale-105">
+                        Liste des Présences
+                    </a>
+                    <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all transform hover:scale-105">
+                        Déconnexion
+                    </a>
                 </div>
             </div>
         </div>
@@ -63,12 +69,12 @@
                     <input type="text" name="name" id="name" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" required>
                 </div>
             
-                <!-- Champ Email -->
+                <!-- Champ Email
                 <div>
                     <label for="email" class="block text-gray-700 font-bold mb-2">Email :</label>
                     <input type="email" name="email" id="email" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" required>
                 </div>
-            
+             -->
                 <!-- Champ Rôle -->
                 <div>
                     <label for="role" class="block text-gray-700 font-bold mb-2">Rôle :</label>
@@ -79,6 +85,10 @@
                 </div>
             
                 <!-- Webcam et capture de photo -->
+                <label for="camera-select">Choisir la caméra :</label>
+                <select id="camera-select">
+                    <option value="">-- Sélectionnez une caméra --</option>
+                </select>
                 <div>
                     <label class="block text-gray-700 font-bold mb-2">Capture de la photo :</label>
                     <div class="webcam-container">
@@ -106,38 +116,89 @@
 
     <!-- Script pour gérer la webcam et la capture de photo -->
     <script>
-        // Accéder à la webcam
-        const video = document.getElementById('webcam');
+    const video = document.getElementById('webcam');
         const canvas = document.getElementById('photo-canvas');
         const photoPreview = document.getElementById('photo-preview');
         const captureButton = document.getElementById('capture-button');
+        const cameraSelect = document.getElementById('camera-select');
 
-        // Démarrer la webcam
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
+        let currentStream = null;
+
+        // Fonction pour lister les caméras disponibles
+        async function listCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                // Ajouter les caméras à la liste déroulante
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Caméra ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Erreur lors de la liste des caméras :", error);
+                alert("Impossible de lister les caméras. Veuillez vérifier les permissions.");
+            }
+        }
+
+        // Fonction pour démarrer la caméra sélectionnée
+        async function startCamera(deviceId) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop()); // Arrêter la caméra actuelle
+            }
+
+            const constraints = {
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-            })
-            .catch((error) => {
-                console.error("Erreur d'accès à la webcam :", error);
-                alert("Impossible d'accéder à la webcam. Veuillez autoriser l'accès.");
-            });
+                currentStream = stream;
+            } catch (error) {
+                console.error("Erreur d'accès à la caméra :", error);
+                alert("Impossible d'accéder à la caméra. Veuillez vérifier les permissions.");
+            }
+        }
+
+        // Écouter les changements de sélection de caméra
+        cameraSelect.addEventListener('change', () => {
+            const selectedDeviceId = cameraSelect.value;
+            startCamera(selectedDeviceId);
+        });
 
         // Capturer une photo
-      // Capturer une photo
-captureButton.addEventListener('click', () => {
-    const context = canvas.getContext('2d');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
 
-    // Convertir l'image en base64
-    const photoDataUrl = canvas.toDataURL('image/jpeg');
-    photoPreview.src = photoDataUrl;
-    photoPreview.classList.remove('hidden');
+            // Ajuster les dimensions du canvas à celles de la vidéo
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
 
-    // Ajouter les données de l'image au champ caché
-    document.getElementById('photo-input').value = photoDataUrl;
-});
+            // Dessiner l'image de la vidéo sur le canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convertir l'image en base64
+            const photoDataUrl = canvas.toDataURL('image/jpeg');
+            photoPreview.src = photoDataUrl;
+            photoPreview.classList.remove('hidden');
+
+            // Ajouter les données de l'image au champ caché
+            document.getElementById('photo-input').value = photoDataUrl;
+
+            console.log("Photo capturée avec succès :", photoDataUrl);
+        });
+
+        // Démarrer la première caméra par défaut au chargement de la page
+        window.addEventListener('load', () => {
+            listCameras();
+            startCamera(); // Démarrer la caméra par défaut
+        });
+
     </script>
+    
+    
 </body>
 </html>

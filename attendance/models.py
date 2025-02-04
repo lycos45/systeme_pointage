@@ -5,7 +5,6 @@ import numpy as np
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)  # Lien vers l'utilisateur
     name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
     role = models.CharField(max_length=50, choices=[('admin', 'Admin'), ('employee', 'Employee')])
     created_at = models.DateTimeField(auto_now_add=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
@@ -13,6 +12,10 @@ class Employee(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def email(self):
+        return self.user.email  # Utilisez l'e-mail de l'utilisateur lié
 
 class WorkSchedule(models.Model):
     """Horaires de travail des employés."""

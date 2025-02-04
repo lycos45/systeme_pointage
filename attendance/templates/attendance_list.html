@@ -18,8 +18,10 @@
                     <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
                 </div>
                 <div class="flex space-x-4">
-                    <a href="{% url 'mark_attendance' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">Pointer ma présence</a>
-                    <a href="{% url 'attendance_history' %}" class="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all">Mon historique</a>
+                    <a href="{% url 'dashboard' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                        Tableau de bord</a>
+                        <a href="{% url 'enroll_employee' %}" class="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-all transform hover:scale-105">
+                            Enrôler un employé</a>
                     <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all">Déconnexion</a>
                 </div>
             </div>

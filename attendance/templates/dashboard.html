@@ -19,11 +19,11 @@
                     <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
                 </div>
                 <div class="flex space-x-4">
-                    <a href="{% url 'dashboard' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                  <!--  <a href="{% url 'dashboard' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
                         Tableau de bord
-                    </a>
+                    </a>-->
                     <a href="{% url 'attendance_list' %}" class="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all transform hover:scale-105">
-                        Liste des employés
+                        Liste des Présences
                     </a>
                     <a href="{% url 'enroll_employee' %}" class="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-all transform hover:scale-105">
                         Enrôler un employé
@@ -74,8 +74,8 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <a href="{% url 'attendance_list' %}" class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
                 <i class="fas fa-users text-4xl text-blue-500 mb-4"></i>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">Liste des employés</h3>
-                <p class="text-gray-600">Voir tous les employés enregistrés.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Liste des Présences</h3>
+                <p class="text-gray-600">Voir tous les employés presents.</p>
             </a>
             <a href="{% url 'enroll_employee' %}" class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
                 <i class="fas fa-user-plus text-4xl text-green-500 mb-4"></i>

@@ -46,7 +46,7 @@ def login_view(request):
             messages.error(request, "Nom d'utilisateur ou mot de passe incorrect.")
     return render(request, 'login.html')
 
-
+"""
 def register(request):
     if request.method == 'POST':
         username = request.POST['username']
@@ -87,7 +87,7 @@ def register(request):
             messages.error(request, f"Erreur : {e}")
             return redirect('register')
     return render(request, 'register.html')
-
+"""
 
 def logout_view(request):
     logout(request)
@@ -140,8 +140,8 @@ def enroll_employee(request):
         role = request.POST.get('role')
         photo_data = request.POST.get('photo')  # Récupérer les données base64
 
-        # Vérifier si l'email est déjà utilisé
-        if Employee.objects.filter(email=email).exists():
+        # Vérifier si l'email est déjà utilisé dans auth_user
+        if User.objects.filter(email=email).exists():
             return JsonResponse({"error": "Cet email est déjà utilisé."}, status=400)
 
         # Convertir l'image base64 en fichier binaire
@@ -161,10 +161,17 @@ def enroll_employee(request):
 
         face_descriptor = face_encodings[0]  # Utilise le premier visage détecté
 
+        # Créer un nouvel utilisateur
+        user = User.objects.create_user(
+            username=email,  # Utilisez l'e-mail comme nom d'utilisateur
+            email=email,
+            password='default_password'  # Vous pouvez générer un mot de passe aléatoire ou utiliser une valeur par défaut
+        )
+
         # Enregistrer l'employé dans la base de données
         employee = Employee.objects.create(
+            user=user,  # Lier l'employé à l'utilisateur
             name=name,
-            email=email,
             role=role,
             face_descriptor=face_descriptor.tobytes()  # Sauvegarde des descripteurs
         )
