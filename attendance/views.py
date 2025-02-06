@@ -22,7 +22,7 @@ from django.contrib.auth.models import User
 from .models import EmailVerification
 import face_recognition
 import numpy as np
-from datetime import date ,timedelta ,datetime
+from datetime import date ,timedelta ,datetime,time
 from django.core.files.base import ContentFile
 from django.views.decorators.csrf import csrf_exempt
 import secrets
@@ -30,7 +30,10 @@ import string
 from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
-
+import json
+from django.utils import timezone
+from PIL import Image
+from .utils.face_recognition_utils import detect_faces, extract_face_descriptor, compare_descriptors
 def home(request):
     return render(request, 'home.html')  
 
@@ -80,6 +83,8 @@ def verify_email(request, user_id, code):
 
 
 
+
+
 # Vue pour enrôler un employé
 
 def enroll_employee(request):
@@ -104,13 +109,11 @@ def enroll_employee(request):
             photo = ContentFile(base64.b64decode(imgstr), name=f'{name}_profile.{ext}')
 
             # Lire l'image et extraire les descripteurs faciaux
-            image = face_recognition.load_image_file(photo)
-            face_encodings = face_recognition.face_encodings(image)
+            image = Image.open(photo)
+            face_descriptor = extract_face_descriptor(image)
 
-            if not face_encodings:
+            if face_descriptor is None:
                 return JsonResponse({"error": "Aucun visage détecté."}, status=400)
-
-            face_descriptor = face_encodings[0]
 
             # Générer un mot de passe temporaire
             password = generate_password()
@@ -127,7 +130,7 @@ def enroll_employee(request):
                 user=user,
                 name=name,
                 role=role,
-                face_descriptor=face_descriptor.tobytes()
+                face_descriptor=face_descriptor.tobytes()  # Convertir en bytes pour le stockage
             )
             employee.profile_picture.save(f'{employee.name}_profile.jpg', photo)
 
@@ -157,38 +160,59 @@ def enroll_employee(request):
     return render(request, 'enroll_employee.html')
 # Vue pour le pointage des présences
 
+
 def mark_attendance(request):
     if request.method == "POST":
         try:
-            # Récupérer la photo en base64
-            data = request.POST.get('photo')
-            if not data:
+            # Lire les données JSON envoyées par le frontend
+            data = json.loads(request.body)
+            photo_data = data.get('photo')
+
+            if not photo_data:
                 return JsonResponse({"error": "Aucune photo n'a été envoyée."}, status=400)
 
             # Convertir la photo base64 en fichier binaire
-            format, imgstr = data.split(';base64,')  # Séparer le préfixe
+            format, imgstr = photo_data.split(';base64,')  # Séparer le préfixe
             ext = format.split('/')[-1]  # Récupérer l'extension (ex: jpeg)
             photo = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
 
             # Lire l'image et extraire les descripteurs faciaux
-            image = face_recognition.load_image_file(photo)
-            face_encodings = face_recognition.face_encodings(image)
+            image = Image.open(photo)
+            input_descriptor = extract_face_descriptor(image)
 
-            if len(face_encodings) == 0:
+            if input_descriptor is None:
                 return JsonResponse({"error": "Aucun visage détecté dans la photo."}, status=400)
 
-            input_descriptor = face_encodings[0]
+            print("Descripteur facial extrait :", input_descriptor)  # Log pour vérifier
 
             # Comparer avec les employés enregistrés
             employees = Employee.objects.all()
             for employee in employees:
                 saved_descriptor = np.frombuffer(employee.face_descriptor, dtype=np.float64)
-                match = face_recognition.compare_faces([saved_descriptor], input_descriptor)
+                print(f"Descripteur stocké pour {employee.name} :", saved_descriptor)  # Log pour vérifier
 
-                if match[0]:
+                match = compare_descriptors(saved_descriptor, input_descriptor, threshold=0.5)
+
+                if match:
+                    print(f"Correspondance trouvée pour {employee.name}")  # Log pour vérifier
+                    # Déterminer le statut en fonction de l'heure actuelle
+                    now = timezone.now()
+                    check_in_time = now.time()  # Heure actuelle
+
+                    # Définir les heures limites
+                    on_time_limit = time(8, 15)  # 8h15
+                    late_limit = time(8, 30)     # 8h30
+
+                    if check_in_time <= on_time_limit:
+                        status = 'on_time'
+                    elif on_time_limit < check_in_time <= late_limit:
+                        status = 'late'
+                    else:
+                        status = 'absent'
+
                     # Enregistrer le pointage
-                    Attendance.objects.create(employee=employee, status='on_time')
-                    return JsonResponse({"success": f"Pointage réussi pour {employee.name}"})
+                    Attendance.objects.create(employee=employee, check_in_time=now, status=status)
+                    return JsonResponse({"success": f"Pointage réussi pour {employee.name} - Statut : {status}"})
 
             return JsonResponse({"error": "Aucun employé correspondant trouvé."}, status=404)
 
@@ -196,7 +220,6 @@ def mark_attendance(request):
             return JsonResponse({"error": f"Erreur lors du traitement de l'image : {str(e)}"}, status=500)
 
     return render(request, 'mark_attendance.html')
-
 # Vue pour la liste des présences
 @login_required
 def attendance_history(request):

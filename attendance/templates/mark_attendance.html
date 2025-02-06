@@ -31,6 +31,14 @@
         <div class="w-full max-w-4xl bg-white rounded-lg shadow-2xl p-8">
             <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Pointage des Présences</h1>
 
+            <!-- Sélecteur de caméra -->
+            <div class="mb-4">
+                <label for="camera-select">Choisir la caméra :</label>
+                <select id="camera-select" class="w-full p-2 border rounded-lg">
+                    <option value="">-- Sélectionnez une caméra --</option>
+                </select>
+            </div>
+
             <!-- Widget de pointage -->
             <div class="bg-gray-50 p-6 rounded-lg shadow-md text-center">
                 <p class="text-gray-600 mb-4">Cliquez sur le bouton ci-dessous pour pointer votre présence.</p>
@@ -63,17 +71,55 @@
         const photoPreview = document.getElementById('photo-preview');
         const captureButton = document.getElementById('capture-button');
         const markButton = document.getElementById('mark-attendance-button');
+        const cameraSelect = document.getElementById('camera-select');
         let photoDataUrl = null;
+        let currentStream = null;
 
-        // Démarrer la webcam
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
-                video.srcObject = stream;
-            })
-            .catch((error) => {
-                console.error("Erreur d'accès à la webcam :", error);
-                alert("Impossible d'accéder à la webcam. Veuillez autoriser l'accès.");
+        // Lister les caméras disponibles
+        async function listCameras() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            // Ajouter les caméras à la liste déroulante
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Caméra ${index + 1}`;
+                cameraSelect.appendChild(option);
             });
+        }
+
+        // Démarrer la caméra sélectionnée
+        async function startCamera(deviceId) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop()); // Arrêter la caméra actuelle
+            }
+
+            const constraints = {
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                currentStream = stream;
+            } catch (error) {
+                console.error("Erreur d'accès à la caméra :", error);
+                alert("Impossible d'accéder à la caméra. Veuillez vérifier les permissions.");
+            }
+        }
+
+        // Écouter les changements de sélection de caméra
+        cameraSelect.addEventListener('change', () => {
+            const selectedDeviceId = cameraSelect.value;
+            startCamera(selectedDeviceId);
+        });
+
+        // Démarrer la première caméra par défaut au chargement de la page
+        window.addEventListener('load', () => {
+            listCameras();
+            startCamera(); // Démarrer la caméra par défaut
+        });
 
         // Capturer une photo
         captureButton.addEventListener('click', () => {

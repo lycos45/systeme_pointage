@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 import numpy as np
+from django.utils import timezone
 
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)  # Lien vers l'utilisateur
@@ -37,18 +38,16 @@ class WorkSchedule(models.Model):
 
 
 class Attendance(models.Model):
-    """Enregistrements des présences."""
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    check_in_time = models.DateTimeField()
-    status = models.CharField(max_length=20, choices=[
-        ('on_time', 'On Time'),
-        ('late', 'Late'),
-        ('absent', 'Absent'),
-    ])
+    check_in_time = models.DateTimeField(default=timezone.now)  # Heure de pointage
+    status = models.CharField(
+        max_length=20,
+        choices=[('on_time', 'À l\'heure'), ('late', 'En retard'), ('absent', 'Absent')],
+        default='on_time'
+    )
 
     def __str__(self):
-        return f"{self.employee.name} - {self.check_in_time.strftime('%Y-%m-%d %H:%M:%S')}"
-
+        return f"{self.employee.name} - {self.check_in_time} - {self.status}"
 
 class EmailVerification(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
