@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.contrib.auth.forms import PasswordChangeForm
+from .models import Employee
 
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
@@ -33,3 +35,12 @@ class RegistrationForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+class ProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Employee
+        fields = ['name', 'profile_picture']
+
+class PasswordUpdateForm(PasswordChangeForm):
+    class Meta:
+        fields = ['old_password', 'new_password1', 'new_password2']

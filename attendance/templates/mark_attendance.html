@@ -10,7 +10,8 @@
 </head>
 <body class="bg-gradient-to-r from-blue-50 to-purple-50">
     <!-- Barre de navigation -->
-    <nav class="bg-white shadow-lg">
+     <!-- Barre de navigation -->
+     <nav class="bg-white shadow-lg">
         <div class="max-w-6xl mx-auto px-4">
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center">
@@ -18,9 +19,16 @@
                     <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
                 </div>
                 <div class="flex space-x-4">
-                    <a href="{% url 'mark_attendance' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">Pointer ma présence</a>
-                    <a href="{% url 'attendance_history' %}" class="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all">Mon historique</a>
-                    <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all">Déconnexion</a>
+                    <a href="{% url 'mark_attendance' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                        Pointer ma présence
+                    </a>
+                   <a href="{% url 'attendance_history' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                        Mon historique
+             
+
+                    <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all transform hover:scale-105">
+                        Déconnexion
+                    </a>
                 </div>
             </div>
         </div>
@@ -64,115 +72,199 @@
         </div>
     </div>
 
-    <!-- Script pour gérer la webcam et la capture de photo -->
+    <!-- Modale pour les paramètres -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg p-6 w-96">
+            <h2 class="text-xl font-bold mb-4">Paramètres</h2>
+            <form id="settings-form">
+                <div class="mb-4">
+                    <label for="name" class="block text-gray-700">Nom</label>
+                    <input type="text" id="name" name="name" class="w-full p-2 border rounded-lg">
+                </div>
+                <div class="mb-4">
+                    <label for="password" class="block text-gray-700">Nouveau mot de passe</label>
+                    <input type="password" id="password" name="password" class="w-full p-2 border rounded-lg">
+                </div>
+                <div class="mb-4">
+                    <label for="profile-picture" class="block text-gray-700">Photo de profil</label>
+                    <input type="file" id="profile-picture" name="profile-picture" class="w-full p-2 border rounded-lg">
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" id="close-modal" class="px-4 py-2 bg-gray-500 text-white rounded-lg mr-2">Fermer</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script pour gérer la webcam, le menu déroulant et le thème -->
     <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('photo-canvas');
-        const photoPreview = document.getElementById('photo-preview');
-        const captureButton = document.getElementById('capture-button');
-        const markButton = document.getElementById('mark-attendance-button');
-        const cameraSelect = document.getElementById('camera-select');
-        let photoDataUrl = null;
-        let currentStream = null;
+        // Variables globales
+        let stream = null;
+        let selectedCameraId = null;
+
+        // Démarrer la webcam
+        async function startWebcam(cameraId = null) {
+            const constraints = {
+                video: {
+                    deviceId: cameraId ? { exact: cameraId } : undefined,
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                },
+            };
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('webcam');
+                video.srcObject = stream;
+            } catch (error) {
+                console.error('Erreur lors de l\'accès à la caméra :', error);
+                alert('Impossible d\'accéder à la caméra. Veuillez vérifier les permissions.');
+            }
+        }
 
         // Lister les caméras disponibles
         async function listCameras() {
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            const cameras = devices.filter(device => device.kind === 'videoinput');
+            const cameraSelect = document.getElementById('camera-select');
 
-            // Ajouter les caméras à la liste déroulante
-            videoDevices.forEach((device, index) => {
+            cameras.forEach((camera, index) => {
                 const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = device.label || `Caméra ${index + 1}`;
+                option.value = camera.deviceId;
+                option.text = camera.label || `Caméra ${index + 1}`;
                 cameraSelect.appendChild(option);
             });
-        }
 
-        // Démarrer la caméra sélectionnée
-        async function startCamera(deviceId) {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop()); // Arrêter la caméra actuelle
-            }
-
-            const constraints = {
-                video: { deviceId: deviceId ? { exact: deviceId } : undefined }
-            };
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = stream;
-                currentStream = stream;
-            } catch (error) {
-                console.error("Erreur d'accès à la caméra :", error);
-                alert("Impossible d'accéder à la caméra. Veuillez vérifier les permissions.");
+            // Démarrer la première caméra par défaut
+            if (cameras.length > 0) {
+                selectedCameraId = cameras[0].deviceId;
+                startWebcam(selectedCameraId);
             }
         }
 
-        // Écouter les changements de sélection de caméra
-        cameraSelect.addEventListener('change', () => {
-            const selectedDeviceId = cameraSelect.value;
-            startCamera(selectedDeviceId);
-        });
-
-        // Démarrer la première caméra par défaut au chargement de la page
-        window.addEventListener('load', () => {
-            listCameras();
-            startCamera(); // Démarrer la caméra par défaut
+        // Changer de caméra
+        document.getElementById('camera-select').addEventListener('change', (event) => {
+            selectedCameraId = event.target.value;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop()); // Arrêter le flux actuel
+            }
+            startWebcam(selectedCameraId);
         });
 
         // Capturer une photo
-        captureButton.addEventListener('click', () => {
-            const context = canvas.getContext('2d');
+        document.getElementById('capture-button').addEventListener('click', () => {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('photo-canvas');
+            const photoPreview = document.getElementById('photo-preview');
+
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Convertir l'image en base64
-            photoDataUrl = canvas.toDataURL('image/jpeg');
-            photoPreview.src = photoDataUrl;
+            // Afficher l'aperçu de la photo
+            photoPreview.src = canvas.toDataURL('image/jpeg');
             photoPreview.classList.remove('hidden');
         });
 
-        // Envoyer la photo au serveur
-        markButton.addEventListener('click', async () => {
-            if (!photoDataUrl) {
-                alert("Veuillez d'abord capturer une photo.");
+        // Envoyer la photo au backend
+        document.getElementById('mark-attendance-button').addEventListener('click', async () => {
+            const canvas = document.getElementById('photo-canvas');
+            const photoPreview = document.getElementById('photo-preview');
+
+            // Vérifier si une photo a été capturée
+            if (!canvas.toDataURL('image/jpeg')) {
+                alert('Veuillez d\'abord capturer une photo.');
                 return;
             }
 
-            markButton.disabled = true;
-            markButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Pointage en cours...';
+            // Extraire les données base64 (sans le préfixe)
+            const photoData = canvas.toDataURL('image/jpeg').split(',')[1];
 
             try {
-                const response = await fetch("{% url 'mark_attendance' %}", {
-                    method: "POST",
+                const response = await fetch('/mark/', {
+                    method: 'POST',
                     headers: {
-                        "X-CSRFToken": "{{ csrf_token }}",
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
                     },
-                    body: JSON.stringify({ photo: photoDataUrl }),
+                    body: JSON.stringify({ photo: photoData }),  // Envoyer uniquement les données base64
                 });
-                const data = await response.json();
 
-                const message = document.getElementById('message');
-                if (response.ok) {
-                    message.textContent = data.success;
-                    message.classList.remove('text-red-500');
-                    message.classList.add('text-green-500');
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('message').textContent = data.success;
                 } else {
-                    message.textContent = data.error || "Erreur lors du pointage.";
-                    message.classList.remove('text-green-500');
-                    message.classList.add('text-red-500');
+                    document.getElementById('message').textContent = data.error || 'Erreur inconnue';
                 }
             } catch (error) {
-                console.error("Erreur :", error);
-                alert("Une erreur est survenue.");
-            } finally {
-                markButton.disabled = false;
-                markButton.innerHTML = '<i class="fas fa-fingerprint mr-2"></i> Pointer ma présence';
+                console.error('Erreur lors de l\'envoi de la photo :', error);
+                document.getElementById('message').textContent = 'Une erreur s\'est produite. Veuillez réessayer.';
             }
         });
+
+        // Gérer l'affichage du menu déroulant
+        document.getElementById('profile-picture').addEventListener('click', () => {
+            const menu = document.getElementById('profile-menu');
+            menu.classList.toggle('hidden');
+        });
+
+        // Fermer le menu si on clique ailleurs
+        document.addEventListener('click', (event) => {
+            const menu = document.getElementById('profile-menu');
+            const profilePicture = document.getElementById('profile-picture');
+            if (!profilePicture.contains(event.target) && !menu.contains(event.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // Basculer entre thème sombre et clair
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const themeToggle = document.getElementById('theme-toggle');
+            if (document.body.classList.contains('dark-mode')) {
+                themeToggle.innerHTML = '<i class="fas fa-sun mr-2"></i>Thème clair';
+            } else {
+                themeToggle.innerHTML = '<i class="fas fa-moon mr-2"></i>Thème sombre';
+            }
+        });
+
+        // Ouvrir la modale des paramètres
+        document.getElementById('settings').addEventListener('click', () => {
+            document.getElementById('settings-modal').classList.remove('hidden');
+        });
+
+        // Fermer la modale
+        document.getElementById('close-modal').addEventListener('click', () => {
+            document.getElementById('settings-modal').classList.add('hidden');
+        });
+
+        // Gérer la soumission du formulaire
+        document.getElementById('settings-form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            alert('Enregistrer les modifications ici.');
+            document.getElementById('settings-modal').classList.add('hidden');
+        });
+
+        // Fonction pour récupérer le token CSRF
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Initialisation
+        listCameras();
     </script>
 </body>
 </html>

@@ -15,9 +15,8 @@ from django.utils.crypto import get_random_string
 from .models import EmailVerification
 from django.urls import reverse
 import base64
-from django.http import JsonResponse
+from django.http import JsonResponse,HttpResponseNotAllowed,HttpResponse
 from django.core.files.base import ContentFile
-from django.http import HttpResponse
 from django.contrib.auth.models import User
 from .models import EmailVerification
 import face_recognition
@@ -33,7 +32,13 @@ from django.template.loader import render_to_string
 import json
 from django.utils import timezone
 from PIL import Image
-from .utils.face_recognition_utils import detect_faces, extract_face_descriptor, compare_descriptors
+import torch 
+from attendance.utils.face_recognition_utils import detect_faces, extract_face_descriptor, compare_descriptors
+from .forms import ProfileUpdateForm, PasswordUpdateForm
+from django.contrib.auth import update_session_auth_hash
+from collections import defaultdict
+
+
 def home(request):
     return render(request, 'home.html')  
 
@@ -86,7 +91,7 @@ def verify_email(request, user_id, code):
 
 
 # Vue pour enrôler un employé
-
+# Créer une instance de MTCNN pour la détection des visages
 def enroll_employee(request):
     if request.method == "POST":
         name = request.POST.get('name')
@@ -108,10 +113,11 @@ def enroll_employee(request):
             ext = format.split('/')[-1]
             photo = ContentFile(base64.b64decode(imgstr), name=f'{name}_profile.{ext}')
 
-            # Lire l'image et extraire les descripteurs faciaux
-            image = Image.open(photo)
-            face_descriptor = extract_face_descriptor(image)
+            # Charger l'image avec PIL
+            image = Image.open(photo).convert('RGB')  # S'assurer qu'elle est en RGB
 
+            # Extraire le descripteur facial
+            face_descriptor = extract_face_descriptor(image)
             if face_descriptor is None:
                 return JsonResponse({"error": "Aucun visage détecté."}, status=400)
 
@@ -125,12 +131,12 @@ def enroll_employee(request):
                 password=password
             )
 
-            # Créer un employé
+            # Créer un employé avec le descripteur sous forme de bytes
             employee = Employee.objects.create(
                 user=user,
                 name=name,
                 role=role,
-                face_descriptor=face_descriptor.tobytes()  # Convertir en bytes pour le stockage
+                face_descriptor=face_descriptor.tobytes()
             )
             employee.profile_picture.save(f'{employee.name}_profile.jpg', photo)
 
@@ -145,7 +151,7 @@ def enroll_employee(request):
 
             send_mail(
                 subject,
-                '',  # On laisse le corps vide car on utilise le format HTML
+                '',  # Corps vide car on utilise un template HTML
                 settings.EMAIL_HOST_USER,
                 [email],
                 fail_silently=False,
@@ -159,8 +165,6 @@ def enroll_employee(request):
 
     return render(request, 'enroll_employee.html')
 # Vue pour le pointage des présences
-
-
 def mark_attendance(request):
     if request.method == "POST":
         try:
@@ -172,9 +176,10 @@ def mark_attendance(request):
                 return JsonResponse({"error": "Aucune photo n'a été envoyée."}, status=400)
 
             # Convertir la photo base64 en fichier binaire
-            format, imgstr = photo_data.split(';base64,')  # Séparer le préfixe
-            ext = format.split('/')[-1]  # Récupérer l'extension (ex: jpeg)
-            photo = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
+            try:
+                photo = ContentFile(base64.b64decode(photo_data), name='temp.jpg')
+            except Exception as e:
+                return JsonResponse({"error": "Format de photo invalide."}, status=400)
 
             # Lire l'image et extraire les descripteurs faciaux
             image = Image.open(photo)
@@ -219,20 +224,32 @@ def mark_attendance(request):
         except Exception as e:
             return JsonResponse({"error": f"Erreur lors du traitement de l'image : {str(e)}"}, status=500)
 
-    return render(request, 'mark_attendance.html')
+    elif request.method == "GET":
+        # Afficher la page de pointage pour les requêtes GET
+        return render(request, 'mark_attendance.html')
+
+    # Retourner une réponse pour les autres méthodes (PUT, DELETE, etc.)
+    return HttpResponseNotAllowed(['GET', 'POST'])
 # Vue pour la liste des présences
 @login_required
 def attendance_history(request):
-    # Récupérer l'employé connecté (si l'employé est lié à l'utilisateur)
-    employee = request.user.employee  # Supposons que l'utilisateur est lié à un employé
+    # Récupérer l'employé connecté
+    employee = request.user.employee
 
-    # Récupérer l'historique des pointages pour cet employé
+    # Récupérer l'historique des pointages et trier par date décroissante
     attendances = Attendance.objects.filter(employee=employee).order_by('-check_in_time')
 
+    # Grouper les pointages par date
+    grouped_attendances = defaultdict(list)
+    for attendance in attendances:
+        date_key = attendance.check_in_time.date()  # Extrait uniquement la date (sans l'heure)
+        grouped_attendances[date_key].append(attendance)
+
     context = {
-        'attendances': attendances,
+        'grouped_attendances': dict(grouped_attendances),
     }
     return render(request, 'attendance_history.html', context)
+
 def attendance_list(request):
     # Récupérer toutes les présences
     attendances = Attendance.objects.all().order_by('-check_in_time')
@@ -255,3 +272,38 @@ def generate_password(length=12):
     """Génère un mot de passe aléatoire."""
     characters = string.ascii_letters + string.digits + string.punctuation
     return ''.join(secrets.choice(characters) for _ in range(length))
+
+@login_required
+def settings_view(request):
+    # Récupérer l'employé connecté
+    employee = Employee.objects.get(user=request.user)
+
+    if request.method == 'POST':
+        # Formulaire de mise à jour du profil
+        profile_form = ProfileUpdateForm(request.POST, request.FILES, instance=employee)
+        # Formulaire de mise à jour du mot de passe
+        password_form = PasswordUpdateForm(request.user, request.POST)
+
+        if 'update_profile' in request.POST:
+            if profile_form.is_valid():
+                profile_form.save()
+                messages.success(request, 'Votre profil a été mis à jour avec succès.')
+                return redirect('settings')
+
+        elif 'update_password' in request.POST:
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)  # Mettre à jour la session pour éviter la déconnexion
+                messages.success(request, 'Votre mot de passe a été mis à jour avec succès.')
+                return redirect('settings')
+
+    else:
+        profile_form = ProfileUpdateForm(instance=employee)
+        password_form = PasswordUpdateForm(request.user)
+
+    context = {
+        'profile_form': profile_form,
+        'password_form': password_form,
+    }
+
+    return render(request, 'settings.html', context)

@@ -1,35 +1,38 @@
-from mtcnn import MTCNN
-from facenet_pytorch import InceptionResnetV1
-import torch
-from PIL import Image
+from deepface import DeepFace
 import numpy as np
 from scipy.spatial.distance import cosine
-
-# Charger les modèles
-mtcnn = MTCNN()
-resnet = InceptionResnetV1(pretrained='vggface2').eval()
 
 def detect_faces(image):
     """
     Détecte les visages dans une image.
-    :param image: Image au format PIL ou numpy array.
-    :return: Liste des visages détectés.
+    :param image: Image au format PIL.
+    :return: Liste des coordonnées des visages détectés.
     """
-    faces = mtcnn.detect(image)
-    return faces
+    # Convertir l'image PIL en tableau numpy
+    image_np = np.array(image)
+    
+    # Détecter les visages avec DeepFace
+    try:
+        faces = DeepFace.extract_faces(img_path=image_np, detector_backend='mtcnn')
+        return [face['facial_area'] for face in faces]
+    except ValueError:
+        return []
 
 def extract_face_descriptor(image):
     """
     Extrait le descripteur facial d'une image.
-    :param image: Image au format PIL ou numpy array.
+    :param image: Image au format PIL.
     :return: Descripteur facial (vecteur numpy) ou None si aucun visage n'est détecté.
     """
-    face = mtcnn(image)  # Détecter et aligner le visage
-    if face is not None:
-        face = face.unsqueeze(0)  # Ajouter une dimension de batch
-        descriptor = resnet(face)  # Extraire le descripteur
-        return descriptor.detach().numpy()
-    return None
+    # Convertir l'image PIL en tableau numpy
+    image_np = np.array(image)
+    
+    # Extraire le descripteur facial avec DeepFace
+    try:
+        descriptor = DeepFace.represent(img_path=image_np, model_name='Facenet', detector_backend='mtcnn')
+        return np.array(descriptor[0]['embedding'])
+    except ValueError:
+        return None
 
 def compare_descriptors(desc1, desc2, threshold=0.5):
     """
@@ -39,5 +42,7 @@ def compare_descriptors(desc1, desc2, threshold=0.5):
     :param threshold: Seuil de similarité (par défaut 0.5).
     :return: True si les descripteurs correspondent, False sinon.
     """
+    if desc1 is None or desc2 is None:
+        return False
     distance = cosine(desc1, desc2)
     return distance < threshold
