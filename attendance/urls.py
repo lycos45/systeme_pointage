@@ -9,7 +9,6 @@ urlpatterns = [
     path('mark/', views.mark_attendance, name='mark_attendance'),
     path('list/', views.attendance_list, name='attendance_list'),
     path('login/', views.login_view, name='login'),  # Connexion
-   #path('register/', views.register, name='register'),  # Inscription
     path('password_reset/', auth_views.PasswordResetView.as_view(), name='password_reset'),
     path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
@@ -18,7 +17,8 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('attendance-history/', views.attendance_history, name='attendance_history'),
     path('settings/', views.settings_view, name='settings'),
-
+    path('employee/<int:employee_id>/', views.employee_details, name='employee_details'),
+    path('manage/work-schedules/', views.manage_work_schedules, name='manage_work_schedules'),
 ]
 
 if settings.DEBUG:

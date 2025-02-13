@@ -4,7 +4,6 @@ import numpy as np
 from django.utils import timezone
 from django import forms
 
-
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)  # Lien vers l'utilisateur
     name = models.CharField(max_length=100)
@@ -22,10 +21,8 @@ class Employee(models.Model):
 
 class WorkSchedule(models.Model):
     """Horaires de travail des employés."""
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    day_of_week = models.CharField(max_length=10, choices=[
+    
+    DAY_OF_WEEK_CHOICES = [
         ('Monday', 'Monday'),
         ('Tuesday', 'Tuesday'),
         ('Wednesday', 'Wednesday'),
@@ -33,7 +30,12 @@ class WorkSchedule(models.Model):
         ('Friday', 'Friday'),
         ('Saturday', 'Saturday'),
         ('Sunday', 'Sunday'),
-    ])
+    ]
+
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    day_of_week = models.CharField(max_length=10, choices=DAY_OF_WEEK_CHOICES)
 
     def __str__(self):
         return f"{self.employee.name} - {self.day_of_week}"
@@ -56,3 +58,10 @@ class EmailVerification(models.Model):
     code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class GeneralWorkSchedule(models.Model):
+    start_time = models.TimeField()  # Heure de début du travail
+    end_time = models.TimeField()    # Heure de fin du travail
+    days_of_week = models.CharField(max_length=50)  # Jours de travail (ex: "Lundi,Mardi,Mercredi")
+
+    def __str__(self):
+        return f"Horaires généraux - {self.days_of_week} ({self.start_time} à {self.end_time})"

@@ -37,6 +37,11 @@ from attendance.utils.face_recognition_utils import detect_faces, extract_face_d
 from .forms import ProfileUpdateForm, PasswordUpdateForm
 from django.contrib.auth import update_session_auth_hash
 from collections import defaultdict
+from .models import WorkSchedule
+from .forms import WorkScheduleForm
+from .models import WorkSchedule
+from .forms import GeneralWorkScheduleForm
+from .models import GeneralWorkSchedule
 
 
 def home(request):
@@ -61,20 +66,68 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('login')  
+@login_required
 def dashboard(request):
+    # Récupérer les paramètres de filtre (par défaut : aujourd'hui)
+    filter_type = request.GET.get('filter', 'today')  # today, week, month, custom
+    employee_id = request.GET.get('employee')  # Filtrer par employé
+
+    # Définir la période en fonction du filtre
     today = date.today()
+    if filter_type == 'today':
+        start_date = today
+        end_date = today
+    elif filter_type == 'week':
+        start_date = today - timedelta(days=today.weekday())  # Début de la semaine (lundi)
+        end_date = start_date + timedelta(days=6)
+    elif filter_type == 'month':
+        start_date = today.replace(day=1)  # Début du mois
+        end_date = start_date.replace(day=28) + timedelta(days=4)  # Fin du mois
+    else:
+        # Filtre personnalisé (à implémenter)
+        start_date = today
+        end_date = today
+
+    # Récupérer les données filtrées
+    attendances = Attendance.objects.filter(
+        check_in_time__date__range=[start_date, end_date],
+        status__in=['on_time', 'late']
+    )
+
+    if employee_id:
+        attendances = attendances.filter(employee_id=employee_id)
+
+    # Calculer les statistiques
     total_employees = Employee.objects.count()
-    present_today = Attendance.objects.filter(check_in_time__date=today).count()
-    absent_today = total_employees - present_today
-    attendance_rate = (present_today / total_employees) * 100 if total_employees > 0 else 0
+    present_count = attendances.distinct('employee').count()
+    absent_count = total_employees - present_count
+    attendance_rate = (present_count / total_employees) * 100 if total_employees > 0 else 0
+
+    # Récupérer la liste des employés pour le filtre
+    employees = Employee.objects.all()
 
     context = {
         'total_employees': total_employees,
-        'present_today': present_today,
-        'absent_today': absent_today,
-        'attendance_rate': attendance_rate,
+        'present_today': present_count,
+        'absent_today': absent_count,
+        'attendance_rate': round(attendance_rate, 2),
+        'employees': employees,
+        'filter_type': filter_type,
+        'selected_employee_id': int(employee_id) if employee_id else None,
     }
+
     return render(request, 'dashboard.html', context)
+@login_required
+def employee_details(request, employee_id):
+    employee = Employee.objects.get(id=employee_id)
+    attendances = Attendance.objects.filter(employee=employee).order_by('-check_in_time')
+
+    context = {
+        'employee': employee,
+        'attendances': attendances,
+    }
+
+    return render(request, 'employee_details.html', context)
 def verify_email(request, user_id, code):
     try:
         user = User.objects.get(id=user_id)
@@ -92,6 +145,7 @@ def verify_email(request, user_id, code):
 
 # Vue pour enrôler un employé
 # Créer une instance de MTCNN pour la détection des visages
+@login_required
 def enroll_employee(request):
     if request.method == "POST":
         name = request.POST.get('name')
@@ -165,6 +219,7 @@ def enroll_employee(request):
 
     return render(request, 'enroll_employee.html')
 # Vue pour le pointage des présences
+@login_required
 def mark_attendance(request):
     if request.method == "POST":
         try:
@@ -200,24 +255,35 @@ def mark_attendance(request):
 
                 if match:
                     print(f"Correspondance trouvée pour {employee.name}")  # Log pour vérifier
-                    # Déterminer le statut en fonction de l'heure actuelle
-                    now = timezone.now()
-                    check_in_time = now.time()  # Heure actuelle
 
-                    # Définir les heures limites
-                    on_time_limit = time(8, 15)  # 8h15
-                    late_limit = time(8, 30)     # 8h30
+                    # Récupérer la date du jour
+                    today = timezone.now().date()
 
-                    if check_in_time <= on_time_limit:
-                        status = 'on_time'
-                    elif on_time_limit < check_in_time <= late_limit:
-                        status = 'late'
+                    # Vérifier si l'employé a déjà pointé aujourd'hui
+                    existing_attendance = Attendance.objects.filter(
+                        employee=employee,
+                        check_in_time__date=today
+                    ).first()
+
+                    # Déterminer le statut en utilisant la fonction
+                    status = determine_attendance_status(employee)
+
+                    if existing_attendance:
+                        # Mettre à jour le pointage existant
+                        existing_attendance.check_in_time = timezone.now()
+                        existing_attendance.status = status
+                        existing_attendance.save()
+                        message = f"Pointage mis à jour pour {employee.name} - Statut : {status}"
                     else:
-                        status = 'absent'
+                        # Créer un nouveau pointage
+                        Attendance.objects.create(
+                            employee=employee,
+                            check_in_time=timezone.now(),
+                            status=status
+                        )
+                        message = f"Pointage réussi pour {employee.name} - Statut : {status}"
 
-                    # Enregistrer le pointage
-                    Attendance.objects.create(employee=employee, check_in_time=now, status=status)
-                    return JsonResponse({"success": f"Pointage réussi pour {employee.name} - Statut : {status}"})
+                    return JsonResponse({"success": message})
 
             return JsonResponse({"error": "Aucun employé correspondant trouvé."}, status=404)
 
@@ -239,24 +305,39 @@ def attendance_history(request):
     # Récupérer l'historique des pointages et trier par date décroissante
     attendances = Attendance.objects.filter(employee=employee).order_by('-check_in_time')
 
+    # Debug : Afficher les données récupérées
+    print("Employee:", employee)
+    print("Attendances QuerySet:", attendances)
+    print("Attendances Count:", attendances.count())
+
     # Grouper les pointages par date
     grouped_attendances = defaultdict(list)
     for attendance in attendances:
         date_key = attendance.check_in_time.date()  # Extrait uniquement la date (sans l'heure)
         grouped_attendances[date_key].append(attendance)
 
+    # Debug : Afficher les données groupées
+    print("Grouped Attendances:", grouped_attendances)
+
     context = {
         'grouped_attendances': dict(grouped_attendances),
     }
     return render(request, 'attendance_history.html', context)
-
+@login_required
 def attendance_list(request):
-    # Récupérer toutes les présences
-    attendances = Attendance.objects.all().order_by('-check_in_time')
+    today = timezone.now().date()
+
+    # Récupérer la dernière présence de chaque employé pour aujourd'hui
+    attendances = Attendance.objects.filter(
+        check_in_time__date=today
+    ).order_by('employee', '-check_in_time').distinct('employee')
+
+    # Filtrer pour exclure les statuts "absent"
+    attendances = [attendance for attendance in attendances if attendance.status != 'absent']
 
     # Calculer les statistiques
-    total_attendances = attendances.count()
-    today_attendances = Attendance.objects.filter(check_in_time__date=datetime.today()).count()
+    total_attendances = len(attendances)
+    today_attendances = total_attendances
     attendance_rate = (today_attendances / Employee.objects.count()) * 100 if Employee.objects.count() > 0 else 0
 
     context = {
@@ -307,3 +388,56 @@ def settings_view(request):
     }
 
     return render(request, 'settings.html', context)
+
+@login_required
+def determine_attendance_status(employee):
+    now = timezone.now()
+    today = now.date()
+
+    # Récupérer l'horaire de travail de l'employé pour aujourd'hui
+    schedule = WorkSchedule.objects.filter(
+        employee=employee,
+        day_of_week=today.strftime('%A')  # Exemple : "Monday"
+    ).first()
+
+    if not schedule:
+        return 'absent'  # Pas d'horaire défini pour aujourd'hui
+
+    # Convertir l'heure de début en datetime pour comparaison
+    start_time = datetime.combine(today, schedule.start_time)
+
+    # Déterminer le statut
+    if now <= start_time:
+        return 'on_time'
+    else:
+        return 'late'
+
+@login_required
+def manage_work_schedules(request):
+    if request.method == 'POST':
+        form = GeneralWorkScheduleForm(request.POST)
+        if form.is_valid():
+            general_schedule = form.save()
+
+            # Appliquer les horaires généraux à tous les employés
+            employees = Employee.objects.all()
+            for employee in employees:
+                WorkSchedule.objects.create(
+                    employee=employee,
+                    start_time=general_schedule.start_time,
+                    end_time=general_schedule.end_time,
+                    day_of_week=general_schedule.days_of_week,
+                )
+
+            return redirect('manage_work_schedules')
+    else:
+        form = GeneralWorkScheduleForm()
+
+    # Récupérer tous les horaires généraux
+    general_schedules = GeneralWorkSchedule.objects.all()
+
+    context = {
+        'form': form,
+        'general_schedules': general_schedules,
+    }
+    return render(request, 'manage_work_schedules.html', context)

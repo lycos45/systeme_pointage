@@ -6,7 +6,6 @@
     <title>Historique des pointages</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
-    <!-- Ajoute FontAwesome pour les icônes -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gradient-to-r from-blue-50 to-purple-50">
@@ -19,7 +18,6 @@
                     <span class="text-xl font-bold text-gray-800">Gestion de Présence</span>
                 </div>
                 <div class="flex space-x-4">
-                    
                     <a href="{% url 'mark_attendance' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
                         Pointer ma présence
                     </a>
@@ -38,37 +36,40 @@
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold text-gray-800 mb-8">Mon historique de pointages</h1>
     
-        {% for date, attendances in grouped_attendances.items %}
-            <!-- Affichage de la date -->
-            <h2 class="text-xl font-semibold text-blue-600 mt-6 mb-2 border-b-2 border-blue-300 pb-1">{{ date|date:"l d F Y" }}</h2>
-    
-            <div class="bg-white p-4 rounded-lg shadow-md">
-                <table class="min-w-full bg-white">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="py-2 px-4 border-b">Heure</th>
-                            <th class="py-2 px-4 border-b">Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for attendance in attendances %}
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="py-2 px-4 border-b">{{ attendance.check_in_time|time:"H:i" }}</td>
-                            <td class="py-2 px-4 border-b">
-                                <span class="px-2 py-1 rounded-full text-sm 
-                                    {% if attendance.status == 'on_time' %}bg-green-100 text-green-800
-                                    {% elif attendance.status == 'late' %}bg-yellow-100 text-yellow-800
-                                    {% else %}bg-red-100 text-red-800{% endif %}">
-                                    {{ attendance.get_status_display }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endfor %}
+        {% if grouped_attendances %}
+            {% for date, attendances in grouped_attendances.items %}
+                <!-- Affichage de la date -->
+                <h2 class="text-xl font-semibold text-blue-600 mt-6 mb-2 border-b-2 border-blue-300 pb-1">{{ date|date:"l d F Y" }}</h2>
+        
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="py-2 px-4 border-b">Heure</th>
+                                <th class="py-2 px-4 border-b">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for attendance in attendances %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="py-2 px-4 border-b">{{ attendance.check_in_time|time:"H:i" }}</td>
+                                <td class="py-2 px-4 border-b">
+                                    <span class="px-2 py-1 rounded-full text-sm 
+                                        {% if attendance.status == 'on_time' %}bg-green-100 text-green-800
+                                        {% elif attendance.status == 'late' %}bg-yellow-100 text-yellow-800
+                                        {% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ attendance.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-600">Aucun pointage trouvé.</p>
+        {% endif %}
     </div>
-    
 </body>
 </html>

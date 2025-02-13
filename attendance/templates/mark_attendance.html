@@ -10,8 +10,7 @@
 </head>
 <body class="bg-gradient-to-r from-blue-50 to-purple-50">
     <!-- Barre de navigation -->
-     <!-- Barre de navigation -->
-     <nav class="bg-white shadow-lg">
+    <nav class="bg-white shadow-lg">
         <div class="max-w-6xl mx-auto px-4">
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center">
@@ -22,10 +21,9 @@
                     <a href="{% url 'mark_attendance' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
                         Pointer ma présence
                     </a>
-                   <a href="{% url 'attendance_history' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
+                    <a href="{% url 'attendance_history' %}" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105">
                         Mon historique
-             
-
+                    </a>
                     <a href="{% url 'logout' %}" class="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all transform hover:scale-105">
                         Déconnexion
                     </a>
@@ -72,31 +70,6 @@
         </div>
     </div>
 
-    <!-- Modale pour les paramètres -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 w-96">
-            <h2 class="text-xl font-bold mb-4">Paramètres</h2>
-            <form id="settings-form">
-                <div class="mb-4">
-                    <label for="name" class="block text-gray-700">Nom</label>
-                    <input type="text" id="name" name="name" class="w-full p-2 border rounded-lg">
-                </div>
-                <div class="mb-4">
-                    <label for="password" class="block text-gray-700">Nouveau mot de passe</label>
-                    <input type="password" id="password" name="password" class="w-full p-2 border rounded-lg">
-                </div>
-                <div class="mb-4">
-                    <label for="profile-picture" class="block text-gray-700">Photo de profil</label>
-                    <input type="file" id="profile-picture" name="profile-picture" class="w-full p-2 border rounded-lg">
-                </div>
-                <div class="flex justify-end">
-                    <button type="button" id="close-modal" class="px-4 py-2 bg-gray-500 text-white rounded-lg mr-2">Fermer</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Enregistrer</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Script pour gérer la webcam, le menu déroulant et le thème -->
     <script>
         // Variables globales
@@ -125,21 +98,32 @@
 
         // Lister les caméras disponibles
         async function listCameras() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = devices.filter(device => device.kind === 'videoinput');
-            const cameraSelect = document.getElementById('camera-select');
+            try {
+                // Demander l'accès à la caméra pour obtenir les labels des appareils
+                await navigator.mediaDevices.getUserMedia({ video: true });
 
-            cameras.forEach((camera, index) => {
-                const option = document.createElement('option');
-                option.value = camera.deviceId;
-                option.text = camera.label || `Caméra ${index + 1}`;
-                cameraSelect.appendChild(option);
-            });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(device => device.kind === 'videoinput');
+                const cameraSelect = document.getElementById('camera-select');
 
-            // Démarrer la première caméra par défaut
-            if (cameras.length > 0) {
-                selectedCameraId = cameras[0].deviceId;
-                startWebcam(selectedCameraId);
+                // Vider la liste actuelle
+                cameraSelect.innerHTML = '<option value="">-- Sélectionnez une caméra --</option>';
+
+                cameras.forEach((camera, index) => {
+                    const option = document.createElement('option');
+                    option.value = camera.deviceId;
+                    option.text = camera.label || `Caméra ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                // Démarrer la première caméra par défaut
+                if (cameras.length > 0) {
+                    selectedCameraId = cameras[0].deviceId;
+                    startWebcam(selectedCameraId);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la liste des caméras :', error);
+                alert('Impossible de lister les caméras. Veuillez vérifier les permissions.');
             }
         }
 
@@ -202,49 +186,6 @@
                 console.error('Erreur lors de l\'envoi de la photo :', error);
                 document.getElementById('message').textContent = 'Une erreur s\'est produite. Veuillez réessayer.';
             }
-        });
-
-        // Gérer l'affichage du menu déroulant
-        document.getElementById('profile-picture').addEventListener('click', () => {
-            const menu = document.getElementById('profile-menu');
-            menu.classList.toggle('hidden');
-        });
-
-        // Fermer le menu si on clique ailleurs
-        document.addEventListener('click', (event) => {
-            const menu = document.getElementById('profile-menu');
-            const profilePicture = document.getElementById('profile-picture');
-            if (!profilePicture.contains(event.target) && !menu.contains(event.target)) {
-                menu.classList.add('hidden');
-            }
-        });
-
-        // Basculer entre thème sombre et clair
-        document.getElementById('theme-toggle').addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            const themeToggle = document.getElementById('theme-toggle');
-            if (document.body.classList.contains('dark-mode')) {
-                themeToggle.innerHTML = '<i class="fas fa-sun mr-2"></i>Thème clair';
-            } else {
-                themeToggle.innerHTML = '<i class="fas fa-moon mr-2"></i>Thème sombre';
-            }
-        });
-
-        // Ouvrir la modale des paramètres
-        document.getElementById('settings').addEventListener('click', () => {
-            document.getElementById('settings-modal').classList.remove('hidden');
-        });
-
-        // Fermer la modale
-        document.getElementById('close-modal').addEventListener('click', () => {
-            document.getElementById('settings-modal').classList.add('hidden');
-        });
-
-        // Gérer la soumission du formulaire
-        document.getElementById('settings-form').addEventListener('submit', (event) => {
-            event.preventDefault();
-            alert('Enregistrer les modifications ici.');
-            document.getElementById('settings-modal').classList.add('hidden');
         });
 
         // Fonction pour récupérer le token CSRF
