@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
 from .models import Employee
 from .models import WorkSchedule
-from .models import GeneralWorkSchedule
+from .models import GlobalWorkSchedule
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
 
@@ -59,12 +59,13 @@ class WorkScheduleForm(forms.ModelForm):
             'day_of_week': forms.Select(choices=WorkSchedule.DAY_OF_WEEK_CHOICES),
         }
 
-class GeneralWorkScheduleForm(forms.ModelForm):
+
+class GlobalWorkScheduleForm(forms.ModelForm):
     class Meta:
-        model = GeneralWorkSchedule
+        model = GlobalWorkSchedule
         fields = ['start_time', 'end_time', 'days_of_week']
         widgets = {
-            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-            'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-            'days_of_week': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Lundi,Mardi,Mercredi'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time'}),
+            'days_of_week': forms.SelectMultiple(choices=WorkSchedule.DAY_OF_WEEK_CHOICES),
         }

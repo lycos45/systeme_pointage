@@ -37,17 +37,22 @@ from attendance.utils.face_recognition_utils import detect_faces, extract_face_d
 from .forms import ProfileUpdateForm, PasswordUpdateForm
 from django.contrib.auth import update_session_auth_hash
 from collections import defaultdict
-from .models import WorkSchedule
-from .forms import WorkScheduleForm
-from .models import WorkSchedule
-from .forms import GeneralWorkScheduleForm
-from .models import GeneralWorkSchedule
 
+from .forms import WorkScheduleForm, GlobalWorkScheduleForm
+from .models import WorkSchedule, GlobalWorkSchedule, Employee
 
 def home(request):
     return render(request, 'home.html')  
 
-
+def contact(request):
+    if request.method == 'POST':
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            # Logique pour envoyer l'e-mail (à implémenter)
+            pass
+    else:
+        form = ContactForm()
+    return render(request, 'contact.html', {'form': form})
 def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -391,6 +396,12 @@ def settings_view(request):
 
 @login_required
 def determine_attendance_status(employee):
+    """
+    Détermine le statut de pointage (à l'heure, en retard, absent) pour un employé.
+    :param employee: L'employé à vérifier.
+    :return: Statut de pointage ('on_time', 'late', 'absent').
+    """
+    # Obtenir l'heure actuelle avec fuseau horaire
     now = timezone.now()
     today = now.date()
 
@@ -403,8 +414,8 @@ def determine_attendance_status(employee):
     if not schedule:
         return 'absent'  # Pas d'horaire défini pour aujourd'hui
 
-    # Convertir l'heure de début en datetime pour comparaison
-    start_time = datetime.combine(today, schedule.start_time)
+    # Convertir l'heure de début en datetime "aware" pour comparaison
+    start_time = timezone.make_aware(datetime.combine(today, schedule.start_time))
 
     # Déterminer le statut
     if now <= start_time:
@@ -415,29 +426,32 @@ def determine_attendance_status(employee):
 @login_required
 def manage_work_schedules(request):
     if request.method == 'POST':
-        form = GeneralWorkScheduleForm(request.POST)
-        if form.is_valid():
-            general_schedule = form.save()
-
-            # Appliquer les horaires généraux à tous les employés
-            employees = Employee.objects.all()
-            for employee in employees:
-                WorkSchedule.objects.create(
-                    employee=employee,
-                    start_time=general_schedule.start_time,
-                    end_time=general_schedule.end_time,
-                    day_of_week=general_schedule.days_of_week,
-                )
-
-            return redirect('manage_work_schedules')
+        if 'global_schedule' in request.POST:
+            global_form = GlobalWorkScheduleForm(request.POST)
+            if global_form.is_valid():
+                global_form.save()
+                return redirect('manage_work_schedules')
+        else:
+            form = WorkScheduleForm(request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect('manage_work_schedules')
     else:
-        form = GeneralWorkScheduleForm()
+        form = WorkScheduleForm()
+        global_form = GlobalWorkScheduleForm()
 
-    # Récupérer tous les horaires généraux
-    general_schedules = GeneralWorkSchedule.objects.all()
+    # Récupérer tous les horaires de travail
+    work_schedules = WorkSchedule.objects.all()
+    global_schedules = GlobalWorkSchedule.objects.all()
 
     context = {
         'form': form,
-        'general_schedules': general_schedules,
+        'global_form': global_form,
+        'work_schedules': work_schedules,
+        'global_schedules': global_schedules,
     }
     return render(request, 'manage_work_schedules.html', context)
+def calendrier_view(request):
+    work_schedules = WorkSchedule.objects.select_related('employee').all()
+    print(work_schedules)  # Vérifie si les horaires sont bien récupérés
+    return render(request, 'manage_work_schedules.html', {'work_schedules': work_schedules})

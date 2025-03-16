@@ -3,7 +3,12 @@ from django.contrib.auth.models import User
 import numpy as np
 from django.utils import timezone
 from django import forms
+from django import forms
 
+class ContactForm(forms.Form):
+    name = forms.CharField(label='Nom', max_length=100)
+    email = forms.EmailField(label='E-mail')
+    message = forms.CharField(label='Message', widget=forms.Textarea)
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)  # Lien vers l'utilisateur
     name = models.CharField(max_length=100)
@@ -58,10 +63,10 @@ class EmailVerification(models.Model):
     code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
 
-class GeneralWorkSchedule(models.Model):
+class GlobalWorkSchedule(models.Model):
     start_time = models.TimeField()  # Heure de début du travail
     end_time = models.TimeField()    # Heure de fin du travail
     days_of_week = models.CharField(max_length=50)  # Jours de travail (ex: "Lundi,Mardi,Mercredi")
 
     def __str__(self):
-        return f"Horaires généraux - {self.days_of_week} ({self.start_time} à {self.end_time})"
+        return f"Horaires globaux - {self.days_of_week_choices} ({self.start_time} à {self.end_time})"

@@ -7,8 +7,49 @@
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <!-- FullCalendar CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
+    <!-- Vanilla Calendar CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.css" rel="stylesheet">
+    <style>
+        /* Styles pour le calendrier */
+        #calendar {
+            height: 600px; /* Ajustez la hauteur selon vos besoins */
+            width: 100%; /* Assurez-vous que le calendrier occupe toute la largeur */
+        }
+
+        /* Styles pour les événements */
+        .event-individual {
+            background-color: #3b82f6; /* Bleu pour les événements individuels */
+            color: white;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        .event-global {
+            background-color: #10b981; /* Vert pour les événements globaux */
+            color: white;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 2px 0;
+        }
+
+        /* Personnalisation des couleurs du calendrier */
+        .vanilla-calendar-day__btn {
+            color: #374151; /* Couleur du texte des jours */
+        }
+
+        .vanilla-calendar-day__btn_today {
+            background-color: #3b82f6; /* Couleur du jour actuel */
+            color: white;
+        }
+
+        .vanilla-calendar-day__btn_selected {
+            background-color: #10b981; /* Couleur des jours sélectionnés */
+            color: white;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-r from-blue-50 to-purple-50">
     <!-- Barre de navigation -->
@@ -35,32 +76,30 @@
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold text-gray-800 mb-8">Gestion des Horaires de Travail</h1>
 
-        <!-- Formulaire pour définir les horaires généraux -->
+        <!-- Formulaire pour définir les horaires -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Définir les horaires généraux</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Définir les horaires</h2>
             <form method="post" class="space-y-4">
                 {% csrf_token %}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
+                        <label for="id_employee" class="block text-sm font-medium text-gray-700">Employé</label>
+                        {{ form.employee }}
+                    </div>
+                    <div>
+                        <label for="id_day_of_week" class="block text-sm font-medium text-gray-700">Jour de travail</label>
+                        {{ form.day_of_week }}
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                         <label for="id_start_time" class="block text-sm font-medium text-gray-700">Heure de début</label>
-                        <input type="time" name="start_time" id="id_start_time" class="mt-1 block w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        {{ form.start_time }}
                     </div>
                     <div>
                         <label for="id_end_time" class="block text-sm font-medium text-gray-700">Heure de fin</label>
-                        <input type="time" name="end_time" id="id_end_time" class="mt-1 block w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        {{ form.end_time }}
                     </div>
-                </div>
-                <div>
-                    <label for="id_days_of_week" class="block text-sm font-medium text-gray-700">Jours de travail</label>
-                    <select name="days_of_week" id="id_days_of_week" class="mt-1 block w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="Monday">Lundi</option>
-                        <option value="Tuesday">Mardi</option>
-                        <option value="Wednesday">Mercredi</option>
-                        <option value="Thursday">Jeudi</option>
-                        <option value="Friday">Vendredi</option>
-                        <option value="Saturday">Samedi</option>
-                        <option value="Sunday">Dimanche</option>
-                    </select>
                 </div>
                 <button type="submit" class="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all">
                     Enregistrer
@@ -68,9 +107,62 @@
             </form>
         </div>
 
-        <!-- Liste des horaires généraux -->
+        <!-- Liste des horaires existants -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Horaires généraux enregistrés</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Horaires enregistrés</h2>
+            <table class="min-w-full bg-white">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jour de travail</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heures</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for schedule in work_schedules %}
+                        <tr class="hover:bg-gray-50 transition-all">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ schedule.employee.name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ schedule.day_of_week }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ schedule.start_time }} - {{ schedule.end_time }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-500">Aucun horaire enregistré.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Formulaire pour définir les horaires globaux -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Définir les horaires globaux</h2>
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <input type="hidden" name="global_schedule" value="true">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="id_start_time" class="block text-sm font-medium text-gray-700">Heure de début</label>
+                        {{ global_form.start_time }}
+                    </div>
+                    <div>
+                        <label for="id_end_time" class="block text-sm font-medium text-gray-700">Heure de fin</label>
+                        {{ global_form.end_time }}
+                    </div>
+                </div>
+                <div>
+                    <label for="id_days_of_week" class="block text-sm font-medium text-gray-700">Jours de travail</label>
+                    {{ global_form.days_of_week }}
+                </div>
+                <button type="submit" class="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all">
+                    Enregistrer
+                </button>
+            </form>
+        </div>
+
+        <!-- Liste des horaires globaux -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Horaires globaux enregistrés</h2>
             <table class="min-w-full bg-white">
                 <thead class="bg-gray-100">
                     <tr>
@@ -79,14 +171,14 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                    {% for schedule in general_schedules %}
+                    {% for schedule in global_schedules %}
                         <tr class="hover:bg-gray-50 transition-all">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ schedule.days_of_week }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ schedule.start_time }} - {{ schedule.end_time }}</td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="2" class="px-6 py-4 text-center text-gray-500">Aucun horaire général enregistré.</td>
+                            <td colspan="2" class="px-6 py-4 text-center text-gray-500">Aucun horaire global enregistré.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -94,74 +186,73 @@
         </div>
 
         <!-- Section du calendrier -->
-        <div class="bg-white p-6 rounded-lg shadow-md mt-8">
+        <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Calendrier des horaires</h2>
             <div id="calendar"></div>
         </div>
     </div>
 
-    <!-- FullCalendar JS -->
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
+    <!-- Vanilla Calendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            console.log("Vanilla Calendar script is running...");
+
             const calendarEl = document.getElementById('calendar');
-            const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'timeGridWeek',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                },
-                events: [
-                    {% for schedule in work_schedules %}
-                        {
-                            title: '{{ schedule.employee.name }}',
-                            start: convertDayToISO('{{ schedule.day_of_week }}', '{{ schedule.start_time }}'),
-                            end: convertDayToISO('{{ schedule.day_of_week }}', '{{ schedule.end_time }}'),
-                            color: getRandomColor(), // Ajouter une couleur aléatoire pour chaque employé
-                        },
-                    {% endfor %}
-                ],
-                eventClick: function(info) {
-                    alert(`Employé: ${info.event.title}\nHeure: ${info.event.start.toLocaleTimeString()} - ${info.event.end.toLocaleTimeString()}`);
-                }
-            });
-            calendar.render();
-        });
-
-        // Fonction pour convertir le jour en une date valide de la semaine en cours
-        function convertDayToISO(dayOfWeek, time) {
-            const daysMapping = {
-                'Monday': 1,
-                'Tuesday': 2,
-                'Wednesday': 3,
-                'Thursday': 4,
-                'Friday': 5,
-                'Saturday': 6,
-                'Sunday': 7
-            };
-
-            const today = new Date();
-            const currentDay = today.getDay(); // 0 (Dimanche) - 6 (Samedi)
-            const targetDay = daysMapping[dayOfWeek];
-
-            let difference = targetDay - currentDay;
-            if (difference < 0) {
-                difference += 7;
+            
+            if (!calendarEl) {
+                console.error("L'élément #calendar est introuvable !");
+                return;
             }
 
-            const targetDate = new Date();
-            targetDate.setDate(today.getDate() + difference);
-            const formattedDate = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            // Événements individuels (horaires par employé)
+            const events = [
+                {% for schedule in work_schedules %}
+                    {
+                        date: "{{ schedule.start_time|date:'Y-m-d' }}", // Date au format YYYY-MM-DD
+                        label: "{{ schedule.employee.name }} ({{ schedule.start_time|time:'H:i' }} - {{ schedule.end_time|time:'H:i' }})", // Libellé avec nom et horaire
+                        class: "event-individual", // Classe CSS pour les événements individuels
+                    },
+                {% endfor %}
+            ];
 
-            return `${formattedDate}T${time}`;
-        }
+            // Événements globaux (horaires pour tous les employés)
+            const globalEvents = [
+                {% for schedule in global_schedules %}
+                    {
+                        date: "{{ schedule.start_time|date:'Y-m-d' }}", // Date au format YYYY-MM-DD
+                        label: "Horaire global ({{ schedule.start_time|time:'H:i' }} - {{ schedule.end_time|time:'H:i' }})", // Libellé avec horaire global
+                        class: "event-global", // Classe CSS pour les événements globaux
+                    },
+                {% endfor %}
+            ];
 
-        // Fonction pour générer une couleur aléatoire
-        function getRandomColor() {
-            const colors = ['#FF5733', '#33FF57', '#3357FF', '#FF33A1', '#33FFF5', '#F5FF33'];
-            return colors[Math.floor(Math.random() * colors.length)];
-        }
+            // Combinez les événements individuels et globaux
+            const allEvents = [...events, ...globalEvents];
+
+            // Initialisation de Vanilla Calendar
+            const calendar = new VanillaCalendar(calendarEl, {
+                type: 'default', // Type de calendrier (default, month, year)
+                settings: {
+                    range: {
+                        min: '2023-01-01', // Date minimale
+                        max: '2023-12-31', // Date maximale
+                    },
+                    selected: {
+                        dates: allEvents.map(event => event.date), // Dates sélectionnées par défaut
+                    },
+                },
+                actions: {
+                    clickDay(event, dates) {
+                        console.log("Date sélectionnée :", dates);
+                        alert(`Date sélectionnée : ${dates}`);
+                    },
+                },
+                dates: allEvents, // Ajout des événements
+            });
+
+            calendar.init();
+        });
     </script>
 </body>
 </html>

@@ -100,7 +100,16 @@
                 </div>
             {% endfor %}
         </div>
+        <!-- Widget dans le tableau de bord -->
+<div class="bg-white p-6 rounded-lg shadow-md text-center transform transition-all duration-300 hover:scale-105">
+    <a href="{% url 'manage_work_schedules' %}" class="block">
+        <i class="fas fa-calendar-alt text-4xl text-blue-500 mb-4"></i>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Gérer les horaires</h3>
+        <p class="text-gray-600">Définir et visualiser les horaires de travail.</p>
+    </a>
+</div>
     </div>
+    
 
     <!-- Script pour le graphique -->
     <script>
