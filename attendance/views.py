@@ -223,11 +223,20 @@ def enroll_employee(request):
             return JsonResponse({"error": f"Une erreur est survenue : {str(e)}"}, status=500)
 
     return render(request, 'enroll_employee.html')
-# Vue pour le pointage des présences
+
+
+# Vue pour le pointage des présences\
+@csrf_exempt
 @login_required
 def mark_attendance(request):
     if request.method == "POST":
         try:
+            # Vérifier que l'utilisateur a un profil employé associé
+            try:
+                employee = request.user.employee
+            except Employee.DoesNotExist:
+                return JsonResponse({"error": "Aucun profil employé associé à ce compte."}, status=403)
+
             # Lire les données JSON envoyées par le frontend
             data = json.loads(request.body)
             photo_data = data.get('photo')
@@ -248,60 +257,59 @@ def mark_attendance(request):
             if input_descriptor is None:
                 return JsonResponse({"error": "Aucun visage détecté dans la photo."}, status=400)
 
-            print("Descripteur facial extrait :", input_descriptor)  # Log pour vérifier
+            # Récupérer le descripteur facial de l'employé connecté
+            saved_descriptor = np.frombuffer(employee.face_descriptor, dtype=np.float64)
+            
+            # Comparer uniquement avec le descripteur de l'utilisateur connecté
+            match = compare_descriptors(saved_descriptor, input_descriptor, threshold=0.4)  # Seuil plus strict
 
-            # Comparer avec les employés enregistrés
-            employees = Employee.objects.all()
-            for employee in employees:
-                saved_descriptor = np.frombuffer(employee.face_descriptor, dtype=np.float64)
-                print(f"Descripteur stocké pour {employee.name} :", saved_descriptor)  # Log pour vérifier
+            if match:
+                # Récupérer la date du jour
+                today = timezone.now().date()
 
-                match = compare_descriptors(saved_descriptor, input_descriptor, threshold=0.5)
+                # Vérifier si l'employé a déjà pointé aujourd'hui
+                existing_attendance = Attendance.objects.filter(
+                    employee=employee,
+                    check_in_time__date=today
+                ).first()
 
-                if match:
-                    print(f"Correspondance trouvée pour {employee.name}")  # Log pour vérifier
+                # Déterminer le statut
+                status = determine_attendance_status(employee)
 
-                    # Récupérer la date du jour
-                    today = timezone.now().date()
-
-                    # Vérifier si l'employé a déjà pointé aujourd'hui
-                    existing_attendance = Attendance.objects.filter(
+                if existing_attendance:
+                    # Mettre à jour le pointage existant
+                    existing_attendance.check_out_time = timezone.now()
+                    existing_attendance.save()
+                    message = f"Pointage enregistre pour {request.user.username}"
+                else:
+                    # Créer un nouveau pointage
+                    Attendance.objects.create(
                         employee=employee,
-                        check_in_time__date=today
-                    ).first()
+                        check_in_time=timezone.now(),
+                        status=status
+                    )
+                    message = f"Arrivée enregistrée pour {request.user.username} - Statut : {status}"
 
-                    # Déterminer le statut en utilisant la fonction
-                    status = determine_attendance_status(employee)
+                return JsonResponse({
+                    "success": message,
+                    "username": request.user.username,
+                    "status": status
+                })
+            else:
+                return JsonResponse({
+                    "error": "La reconnaissance faciale a échoué.",
+                    "detail": "Le visage détecté ne correspond pas à votre profil."
+                }, status=403)
 
-                    if existing_attendance:
-                        # Mettre à jour le pointage existant
-                        existing_attendance.check_in_time = timezone.now()
-                        existing_attendance.status = status
-                        existing_attendance.save()
-                        message = f"Pointage mis à jour pour {employee.name} - Statut : {status}"
-                    else:
-                        # Créer un nouveau pointage
-                        Attendance.objects.create(
-                            employee=employee,
-                            check_in_time=timezone.now(),
-                            status=status
-                        )
-                        message = f"Pointage réussi pour {employee.name} - Statut : {status}"
-
-                    return JsonResponse({"success": message})
-
-            return JsonResponse({"error": "Aucun employé correspondant trouvé."}, status=404)
-
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Données JSON invalides."}, status=400)
         except Exception as e:
-            return JsonResponse({"error": f"Erreur lors du traitement de l'image : {str(e)}"}, status=500)
+            return JsonResponse({"error": f"Erreur lors du traitement: {str(e)}"}, status=500)
 
     elif request.method == "GET":
-        # Afficher la page de pointage pour les requêtes GET
         return render(request, 'mark_attendance.html')
 
-    # Retourner une réponse pour les autres méthodes (PUT, DELETE, etc.)
     return HttpResponseNotAllowed(['GET', 'POST'])
-# Vue pour la liste des présences
 @login_required
 def attendance_history(request):
     # Récupérer l'employé connecté
